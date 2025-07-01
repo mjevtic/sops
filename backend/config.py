@@ -1,0 +1,85 @@
+"""
+Secure configuration management for SupportOps Automator
+"""
+import os
+from typing import List
+from pydantic import BaseSettings, validator
+from cryptography.fernet import Fernet
+
+
+class Settings(BaseSettings):
+    """Application settings with validation and security features"""
+    
+    # Database
+    database_url: str
+    
+    # Security
+    secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    encryption_key: str
+    
+    # CORS
+    allowed_origins: List[str] = ["http://localhost:3000"]
+    
+    # Rate Limiting
+    rate_limit_per_minute: int = 60
+    redis_url: str = "redis://localhost:6379"
+    
+    # Webhook Security
+    webhook_secret: str
+    
+    # Monitoring
+    sentry_dsn: str = ""
+    environment: str = "development"
+    
+    # Logging
+    log_level: str = "INFO"
+    
+    @validator('allowed_origins', pre=True)
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',')]
+        return v
+    
+    @validator('secret_key')
+    def validate_secret_key(cls, v):
+        if len(v) < 32:
+            raise ValueError('SECRET_KEY must be at least 32 characters long')
+        return v
+    
+    @validator('encryption_key')
+    def validate_encryption_key(cls, v):
+        try:
+            # Validate that the encryption key is valid for Fernet
+            Fernet(v.encode())
+        except Exception:
+            raise ValueError('ENCRYPTION_KEY must be a valid Fernet key')
+        return v
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+
+# Global settings instance
+settings = Settings()
+
+# Encryption utility
+def get_cipher():
+    """Get Fernet cipher for encrypting/decrypting sensitive data"""
+    return Fernet(settings.encryption_key.encode())
+
+
+def encrypt_data(data: str) -> str:
+    """Encrypt sensitive data"""
+    cipher = get_cipher()
+    return cipher.encrypt(data.encode()).decode()
+
+
+def decrypt_data(encrypted_data: str) -> str:
+    """Decrypt sensitive data"""
+    cipher = get_cipher()
+    return cipher.decrypt(encrypted_data.encode()).decode()
+
