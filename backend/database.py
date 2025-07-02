@@ -13,9 +13,16 @@ from config import settings
 logging.basicConfig(level=getattr(logging, settings.log_level))
 logger = logging.getLogger(__name__)
 
+# Fix postgres:// to postgresql:// if needed
+def fix_postgres_url(url):
+    """Convert postgres:// to postgresql:// if needed"""
+    if url.startswith('postgres://'):
+        return url.replace('postgres://', 'postgresql://', 1)
+    return url
+
 # Create async engine with security configurations
 engine = create_async_engine(
-    settings.database_url,
+    fix_postgres_url(settings.database_url),
     echo=settings.environment == "development",
     pool_pre_ping=True,  # Verify connections before use
     pool_recycle=3600,   # Recycle connections every hour
