@@ -3,7 +3,7 @@ Integration read handlers
 """
 import logging
 from typing import List, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 @rate_limit_by_user("20/minute")
 def get_integrations(
+    request: Request,
     platform: Optional[IntegrationType] = None,
     status_filter: Optional[IntegrationStatus] = None,
     current_user: User = Depends(get_current_user),
@@ -83,6 +84,7 @@ def get_integrations(
 @rate_limit_by_user("20/minute")
 def get_integration(
     integration_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
@@ -135,7 +137,7 @@ def get_integration(
         )
 
 @rate_limit_by_user("10/minute")
-def get_available_platforms():
+def get_available_platforms(request: Request):
     """
     Get list of available integration platforms
     """

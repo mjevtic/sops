@@ -102,6 +102,7 @@ def create_user(
 @router.get("/", response_model=List[UserResponse])
 @rate_limit_by_user("30/minute")
 def get_users(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     role: Optional[UserRole] = None,
@@ -155,6 +156,7 @@ def get_users(
 @rate_limit_by_user("30/minute")
 def get_user(
     user_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):

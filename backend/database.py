@@ -23,20 +23,32 @@ def get_database_url(url):
     return url
 
 # Create sync engine with security configurations
-engine = create_engine(
-    get_database_url(settings.database_url),
-    echo=settings.environment == "development",
-    pool_pre_ping=True,  # Verify connections before use
-    pool_recycle=3600,   # Recycle connections every hour
-    pool_size=10,        # Connection pool size
-    max_overflow=20,     # Maximum overflow connections
-    connect_args={
-        "sslmode": "require" if settings.environment == "production" else "prefer",
-        "application_name": "supportops-automator",
-        "connect_timeout": 10,
-        "command_timeout": 30,
-    }
-)
+db_url = get_database_url(settings.database_url)
+
+# Configure engine based on database type
+if db_url.startswith('sqlite'):
+    # SQLite specific configuration
+    engine = create_engine(
+        db_url,
+        echo=settings.environment == "development",
+        connect_args={"check_same_thread": False}  # Allow multi-threading for SQLite
+    )
+else:
+    # PostgreSQL specific configuration
+    engine = create_engine(
+        db_url,
+        echo=settings.environment == "development",
+        pool_pre_ping=True,  # Verify connections before use
+        pool_recycle=3600,   # Recycle connections every hour
+        pool_size=10,        # Connection pool size
+        max_overflow=20,     # Maximum overflow connections
+        connect_args={
+            "sslmode": "require" if settings.environment == "production" else "prefer",
+            "application_name": "supportops-automator",
+            "connect_timeout": 10,
+            "command_timeout": 30,
+        }
+    )
 
 # Create session factory
 SessionLocal = sessionmaker(

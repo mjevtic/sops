@@ -103,6 +103,7 @@ def create_rule(
 @router.get("/", response_model=List[RuleResponse])
 @rate_limit_by_user("30/minute")
 def get_rules(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     status_filter: Optional[RuleStatus] = None,
@@ -175,6 +176,7 @@ def get_rules(
 @rate_limit_by_user("30/minute")
 def get_rule(
     rule_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
@@ -434,6 +436,7 @@ def delete_rule(
 def test_rule(
     rule_id: int,
     test_payload: dict,
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):

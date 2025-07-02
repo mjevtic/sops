@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     
     # Webhook Security
     webhook_secret: str = ""  # Make optional for initial setup
+    freshdesk_webhook_secret: str = ""  # Secret for Freshdesk webhook validation
+    zendesk_webhook_secret: str = ""  # Secret for Zendesk webhook validation
     
     # Monitoring
     sentry_dsn: str = ""

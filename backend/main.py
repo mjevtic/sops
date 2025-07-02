@@ -3,7 +3,7 @@ Main FastAPI application for SupportOps Automator
 """
 import logging
 from contextlib import contextmanager
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
@@ -14,7 +14,7 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from config import settings
 from database import init_database, close_db, health_check
 from middleware import setup_security_middleware, rate_limit_by_ip
-from routes import auth, rules, webhooks, users, integrations, admin
+from routes import auth, rules, webhooks, users, integrations
 
 # Configure logging
 logging.basicConfig(
@@ -132,7 +132,7 @@ async def general_exception_handler(request, exc):
 # Health check endpoints
 @app.get("/health")
 @rate_limit_by_ip("10/minute")
-async def health_check_endpoint():
+async def health_check_endpoint(request: Request):
     """Health check endpoint"""
     try:
         db_healthy = await health_check()
@@ -156,7 +156,7 @@ async def health_check_endpoint():
 
 @app.get("/")
 @rate_limit_by_ip("5/minute")
-async def root():
+async def root(request: Request):
     """Root endpoint"""
     return {
         "message": "SupportOps Automator API",
@@ -169,7 +169,7 @@ async def root():
 # Metrics endpoint for monitoring
 @app.get("/metrics")
 @rate_limit_by_ip("5/minute")
-async def metrics():
+async def metrics(request: Request):
     """Basic metrics endpoint"""
     try:
         from prometheus_client import generate_latest, CONTENT_TYPE_LATEST

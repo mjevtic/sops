@@ -28,12 +28,14 @@ wheels/
 venv/
 env/
 ENV/
+.venv/
 
 # IDE specific files
 .idea/
 .vscode/
 *.swp
 *.swo
+.history/
 
 # Environment variables
 .env
@@ -42,14 +44,55 @@ ENV/
 .env.test.local
 .env.production.local
 
+# Local development files
+.env.development
+.env.test
+.env.local-dev
+*.local.py
+
 # Logs
 logs/
 *.log
+log/
 
 # Database
 *.sqlite
+*.sqlite3
 *.db
 
 # OS specific
 .DS_Store
 Thumbs.db
+.directory
+
+# Local development server files
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Docker related
+.docker/
+docker-compose.override.yml
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Node modules (for frontend)
+node_modules/
+
+# Redis dump file
+dump.rdb
+
+# Celery beat schedule file
+celerybeat-schedule
+
+# Local development database data
+data/
+
+# Local development media files
+media/
+uploads/

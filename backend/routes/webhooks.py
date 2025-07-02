@@ -316,7 +316,7 @@ async def github_webhook(
 
 @router.get("/execution/{execution_id}")
 @rate_limit_by_ip("30/minute")
-async def get_execution_status(execution_id: str):
+async def get_execution_status(execution_id: str, request: Request):
     """
     Get execution status by ID
     """
@@ -357,6 +357,7 @@ if settings.environment == "development":
         platform: str,
         event: str,
         payload: Dict[str, Any],
+        request: Request,
         session: Session = Depends(get_session)
     ):
         """
