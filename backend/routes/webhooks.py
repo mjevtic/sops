@@ -4,7 +4,7 @@ Webhook routes with enhanced Freshdesk and Zendesk support and signature verific
 import json
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from database import get_session
 from services.rule_engine import rule_engine
 from middleware import verify_webhook_signature, rate_limit_by_ip, get_remote_address
@@ -68,7 +68,7 @@ async def verify_signature(
 @rate_limit_by_ip("100/minute")
 async def zendesk_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Session = Depends(get_session),
     verified_body: bytes = Depends(verify_signature)
 ):
     """
@@ -131,7 +131,7 @@ async def zendesk_webhook(
 @rate_limit_by_ip("100/minute")
 async def freshdesk_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Session = Depends(get_session),
     verified_body: bytes = Depends(verify_signature)
 ):
     """
@@ -194,7 +194,7 @@ async def freshdesk_webhook(
 @rate_limit_by_ip("100/minute")
 async def jira_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Session = Depends(get_session),
     verified_body: bytes = Depends(verify_signature)
 ):
     """
@@ -256,7 +256,7 @@ async def jira_webhook(
 @rate_limit_by_ip("100/minute")
 async def github_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Session = Depends(get_session),
     verified_body: bytes = Depends(verify_signature),
     x_github_event: str = Header(None, alias="X-GitHub-Event")
 ):
@@ -357,7 +357,7 @@ if settings.environment == "development":
         platform: str,
         event: str,
         payload: Dict[str, Any],
-        session: AsyncSession = Depends(get_session)
+        session: Session = Depends(get_session)
     ):
         """
         Test webhook endpoint for development
@@ -391,7 +391,7 @@ if settings.environment == "development":
 @rate_limit_by_ip("100/minute")
 async def handle_freshdesk_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Session = Depends(get_session),
     body: bytes = Depends(verify_signature)
 ):
     """
@@ -446,7 +446,7 @@ async def handle_freshdesk_webhook(
 @rate_limit_by_ip("100/minute")
 async def handle_zendesk_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Session = Depends(get_session),
     body: bytes = Depends(verify_signature)
 ):
     """

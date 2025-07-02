@@ -6,7 +6,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, update, and_
 from models.rule import Rule, RuleStatus, RuleExecution
 from models.audit import AuditLogCreate, AuditAction
@@ -25,9 +25,9 @@ class RuleEngine:
     def __init__(self):
         self.execution_cache = {}  # Cache for ongoing executions
     
-    async def process_trigger(
+    def process_trigger(
         self,
-        session: AsyncSession,
+        session: Session,
         platform: str,
         event: str,
         payload: Dict[str, Any],
@@ -45,7 +45,7 @@ class RuleEngine:
             logger.info(f"Processing trigger: {platform}.{event} [{request_id}]")
             
             # Find matching rules
-            matching_rules = await self._find_matching_rules(
+            matching_rules = self._find_matching_rules(
                 session, platform, event, payload
             )
             
@@ -55,10 +55,10 @@ class RuleEngine:
             
             logger.info(f"Found {len(matching_rules)} matching rules")
             
-            # Execute rules asynchronously
+            # Execute rules
             execution_ids = []
             for rule in matching_rules:
-                execution_id = await self._execute_rule(
+                execution_id = self._execute_rule(
                     session, rule, payload, request_id
                 )
                 if execution_id:
@@ -70,9 +70,9 @@ class RuleEngine:
             logger.error(f"Error processing trigger: {e}")
             raise
     
-    async def _find_matching_rules(
+    def _find_matching_rules(
         self,
-        session: AsyncSession,
+        session: Session,
         platform: str,
         event: str,
         payload: Dict[str, Any]
@@ -80,7 +80,7 @@ class RuleEngine:
         """Find rules that match the trigger"""
         try:
             # Get active rules for the platform and event
-            result = await session.execute(
+            result = session.execute(
                 select(Rule).where(
                     and_(
                         Rule.trigger_platform == platform,
@@ -95,9 +95,9 @@ class RuleEngine:
             
             matching_rules = []
             for rule in rules:
-                if await self._evaluate_conditions(rule, payload):
+                if self._evaluate_conditions(rule, payload):
                     # Check rate limiting
-                    if await self._check_rate_limit(session, rule):
+                    if self._check_rate_limit(session, rule):
                         matching_rules.append(rule)
                     else:
                         logger.warning(f"Rate limit exceeded for rule {rule.id}")
@@ -108,7 +108,7 @@ class RuleEngine:
             logger.error(f"Error finding matching rules: {e}")
             return []
     
-    async def _evaluate_conditions(
+    def _evaluate_conditions(
         self,
         rule: Rule,
         payload: Dict[str, Any]
@@ -161,9 +161,9 @@ class RuleEngine:
             logger.error(f"Error evaluating conditions for rule {rule.id}: {e}")
             return False
     
-    async def _check_rate_limit(
+    def _check_rate_limit(
         self,
-        session: AsyncSession,
+        session: Session,
         rule: Rule
     ) -> bool:
         """Check if rule execution is within rate limits"""
@@ -184,9 +184,9 @@ class RuleEngine:
             logger.error(f"Error checking rate limit for rule {rule.id}: {e}")
             return False
     
-    async def _execute_rule(
+    def _execute_rule(
         self,
-        session: AsyncSession,
+        session: Session,
         rule: Rule,
         trigger_data: Dict[str, Any],
         request_id: str
@@ -214,7 +214,7 @@ class RuleEngine:
             actions_executed = []
             for action in rule.actions:
                 try:
-                    action_result = await self._execute_action(
+                    action_result = self._execute_action(
                         session, action, trigger_data, rule
                     )
                     actions_executed.append({
@@ -236,17 +236,17 @@ class RuleEngine:
             execution.actions_executed = actions_executed
             
             # Update rule statistics
-            await session.execute(
+            session.execute(
                 update(Rule).where(Rule.id == rule.id).values(
                     execution_count=rule.execution_count + 1,
                     last_executed_at=datetime.utcnow(),
                     last_execution_status="success"
                 )
             )
-            await session.commit()
+            session.commit()
             
             # Log execution
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=rule.user_id,
@@ -273,16 +273,16 @@ class RuleEngine:
             logger.error(f"Rule execution failed: {e}")
             
             # Update rule with error
-            await session.execute(
+            session.execute(
                 update(Rule).where(Rule.id == rule.id).values(
                     last_execution_status="failed",
                     last_execution_error=str(e)
                 )
             )
-            await session.commit()
+            session.commit()
             
             # Log execution failure
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=rule.user_id,
@@ -306,9 +306,9 @@ class RuleEngine:
             if execution_id in self.execution_cache:
                 del self.execution_cache[execution_id]
     
-    async def _execute_action(
+    def _execute_action(
         self,
-        session: AsyncSession,
+        session: Session,
         action: Dict[str, Any],
         trigger_data: Dict[str, Any],
         rule: Rule
@@ -324,7 +324,7 @@ class RuleEngine:
             logger.info(f"Executing action: {platform}.{action_type}")
             
             # Get integration credentials
-            integration = await self._get_integration(session, rule.user_id, platform)
+            integration = self._get_integration(session, rule.user_id, platform)
             if not integration:
                 raise ValueError(f"No integration found for platform: {platform}")
             
@@ -340,7 +340,7 @@ class RuleEngine:
             credentials = json.loads(decrypt_data(integration.credentials.encrypted_credentials))
             
             # Execute action
-            result = await action_function(
+            result = action_function(
                 credentials=credentials,
                 action_config=action,
                 trigger_data=trigger_data,
@@ -348,13 +348,13 @@ class RuleEngine:
             )
             
             # Update integration statistics
-            await session.execute(
+            session.execute(
                 update(Integration).where(Integration.id == integration.id).values(
                     total_actions_executed=integration.total_actions_executed + 1,
                     last_action_executed_at=datetime.utcnow()
                 )
             )
-            await session.commit()
+            session.commit()
             
             return result
             
@@ -362,15 +362,15 @@ class RuleEngine:
             logger.error(f"Action execution error: {e}")
             raise
     
-    async def _get_integration(
+    def _get_integration(
         self,
-        session: AsyncSession,
+        session: Session,
         user_id: int,
         platform: str
     ) -> Optional[Integration]:
         """Get user's integration for a platform"""
         try:
-            result = await session.execute(
+            result = session.execute(
                 select(Integration).join(IntegrationCredential).where(
                     and_(
                         Integration.user_id == user_id,
@@ -386,13 +386,13 @@ class RuleEngine:
             logger.error(f"Error getting integration: {e}")
             return None
     
-    async def get_execution_status(self, execution_id: str) -> Optional[RuleExecution]:
+    def get_execution_status(self, execution_id: str) -> Optional[RuleExecution]:
         """Get execution status"""
         return self.execution_cache.get(execution_id)
     
-    async def test_rule(
+    def test_rule(
         self,
-        session: AsyncSession,
+        session: Session,
         rule: Rule,
         test_payload: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -401,7 +401,7 @@ class RuleEngine:
             logger.info(f"Testing rule {rule.id}")
             
             # Check if conditions match
-            conditions_match = await self._evaluate_conditions(rule, test_payload)
+            conditions_match = self._evaluate_test_conditions(rule, test_payload)
             
             if not conditions_match:
                 return {

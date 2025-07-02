@@ -207,8 +207,8 @@ class AuthService:
             return None
     
     @staticmethod
-    async def get_current_user(
-        session: AsyncSession, 
+    def get_current_user(
+        session: Session, 
         token: str
     ) -> Optional[User]:
         """Get current user from JWT token"""
@@ -217,7 +217,7 @@ class AuthService:
             return None
         
         try:
-            result = await session.execute(
+            result = session.execute(
                 select(User).where(User.id == token_data.user_id)
             )
             user = result.scalar_one_or_none()
@@ -232,8 +232,8 @@ class AuthService:
             return None
     
     @staticmethod
-    async def refresh_access_token(
-        session: AsyncSession,
+    def refresh_access_token(
+        session: Session,
         refresh_token: str
     ) -> Optional[Token]:
         """Refresh access token using refresh token"""
@@ -251,7 +251,7 @@ class AuthService:
                 return None
             
             # Get user
-            result = await session.execute(
+            result = session.execute(
                 select(User).where(User.id == user_id)
             )
             user = result.scalar_one_or_none()
@@ -278,8 +278,8 @@ class AuthService:
             return None
     
     @staticmethod
-    async def change_password(
-        session: AsyncSession,
+    def change_password(
+        session: Session,
         user: User,
         old_password: str,
         new_password: str,
@@ -296,7 +296,7 @@ class AuthService:
             new_hashed_password = get_password_hash(new_password)
             
             # Update password
-            await session.execute(
+            session.execute(
                 update(User)
                 .where(User.id == user.id)
                 .values(
@@ -304,7 +304,7 @@ class AuthService:
                     password_changed_at=datetime.utcnow()
                 )
             )
-            await session.commit()
+            session.commit()
             
             # Log password change
             audit_log = AuditLog(
@@ -319,12 +319,12 @@ class AuthService:
                 status="success"
             )
             session.add(audit_log)
-            await session.commit()
+            session.commit()
             
             return True
             
         except Exception as e:
             logger.error(f"Password change error: {e}")
-            await session.rollback()
+            session.rollback()
             return False
 

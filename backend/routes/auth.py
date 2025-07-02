@@ -68,15 +68,15 @@ def login(
 
 @router.post("/refresh", response_model=Token)
 @rate_limit_by_ip("10/minute")
-async def refresh_token(
+def refresh_token(
     refresh_token: str,
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Refresh access token using refresh token
     """
     try:
-        new_token = await AuthService.refresh_access_token(session, refresh_token)
+        new_token = AuthService.refresh_access_token(session, refresh_token)
         
         if not new_token:
             raise HTTPException(
@@ -98,24 +98,24 @@ async def refresh_token(
 
 @router.post("/logout")
 @rate_limit_by_ip("10/minute")
-async def logout(
+def logout(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Logout user (invalidate token)
     """
     try:
         # Get current user
-        user = await AuthService.get_current_user(session, credentials.credentials)
+        user = AuthService.get_current_user(session, credentials.credentials)
         
         if user:
             # Log logout
             client_ip = get_remote_address(request)
             user_agent = request.headers.get("user-agent")
             
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=user.id,
@@ -137,15 +137,15 @@ async def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(
+def get_current_user_info(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Get current user information
     """
     try:
-        user = await AuthService.get_current_user(session, credentials.credentials)
+        user = AuthService.get_current_user(session, credentials.credentials)
         
         if not user:
             raise HTTPException(
@@ -177,18 +177,18 @@ async def get_current_user_info(
 
 
 @router.post("/change-password")
-async def change_password(
+def change_password(
     old_password: str,
     new_password: str,
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Change user password
     """
     try:
-        user = await AuthService.get_current_user(session, credentials.credentials)
+        user = AuthService.get_current_user(session, credentials.credentials)
         
         if not user:
             raise HTTPException(
@@ -206,7 +206,7 @@ async def change_password(
         client_ip = get_remote_address(request)
         user_agent = request.headers.get("user-agent")
         
-        success = await AuthService.change_password(
+        success = AuthService.change_password(
             session=session,
             user=user,
             old_password=old_password,
@@ -234,14 +234,14 @@ async def change_password(
 
 
 # Dependency to get current user
-async def get_current_user(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ) -> User:
     """
     Dependency to get current authenticated user
     """
-    user = await AuthService.get_current_user(session, credentials.credentials)
+    user = AuthService.get_current_user(session, credentials.credentials)
     
     if not user:
         raise HTTPException(
@@ -254,7 +254,7 @@ async def get_current_user(
 
 
 # Dependency to require admin role
-async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """
     Dependency to require admin role
     """

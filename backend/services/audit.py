@@ -4,7 +4,7 @@ Audit service for compliance and security logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, or_, desc
 from models.audit import AuditLog, AuditAction, AuditLogCreate, AuditLogFilter
 from models.user import User
@@ -17,8 +17,8 @@ class AuditService:
     """Service for managing audit logs and compliance"""
     
     @staticmethod
-    async def log_action(
-        session: AsyncSession,
+    def log_action(
+        session: Session,
         audit_data: AuditLogCreate,
         request_id: Optional[str] = None
     ) -> AuditLog:
@@ -49,19 +49,19 @@ class AuditService:
             )
             
             session.add(audit_log)
-            await session.commit()
+            session.commit()
             
             logger.info(f"Audit log created: {audit_data.action} by {audit_data.username}")
             return audit_log
             
         except Exception as e:
             logger.error(f"Error creating audit log: {e}")
-            await session.rollback()
+            session.rollback()
             raise
     
     @staticmethod
-    async def get_audit_logs(
-        session: AsyncSession,
+    def get_audit_logs(
+        session: Session,
         filters: AuditLogFilter,
         current_user: User
     ) -> List[AuditLog]:
@@ -111,7 +111,7 @@ class AuditService:
             # Apply pagination
             query = query.offset(filters.offset).limit(filters.limit)
             
-            result = await session.execute(query)
+            result = session.execute(query)
             return result.scalars().all()
             
         except Exception as e:
@@ -119,8 +119,8 @@ class AuditService:
             raise
     
     @staticmethod
-    async def get_security_events(
-        session: AsyncSession,
+    def get_security_events(
+        session: Session,
         hours: int = 24,
         current_user: User = None
     ) -> List[AuditLog]:
@@ -147,7 +147,7 @@ class AuditService:
                 )
             ).order_by(desc(AuditLog.timestamp))
             
-            result = await session.execute(query)
+            result = session.execute(query)
             return result.scalars().all()
             
         except Exception as e:
@@ -155,8 +155,8 @@ class AuditService:
             raise
     
     @staticmethod
-    async def get_user_activity(
-        session: AsyncSession,
+    def get_user_activity(
+        session: Session,
         user_id: int,
         days: int = 30,
         current_user: User = None
@@ -179,7 +179,7 @@ class AuditService:
                 )
             ).order_by(desc(AuditLog.timestamp))
             
-            result = await session.execute(query)
+            result = session.execute(query)
             return result.scalars().all()
             
         except Exception as e:
@@ -187,8 +187,8 @@ class AuditService:
             raise
     
     @staticmethod
-    async def export_user_data(
-        session: AsyncSession,
+    def export_user_data(
+        session: Session,
         user_id: int,
         current_user: User
     ) -> Dict[str, Any]:
@@ -201,7 +201,7 @@ class AuditService:
         
         try:
             # Get user data
-            user_result = await session.execute(
+            user_result = session.execute(
                 select(User).where(User.id == user_id)
             )
             user = user_result.scalar_one_or_none()
@@ -210,7 +210,7 @@ class AuditService:
                 raise ValueError("User not found")
             
             # Get audit logs
-            audit_result = await session.execute(
+            audit_result = session.execute(
                 select(AuditLog).where(AuditLog.user_id == user_id)
                 .order_by(desc(AuditLog.timestamp))
             )
@@ -243,7 +243,7 @@ class AuditService:
             }
             
             # Log the data export
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=current_user.id,
@@ -265,8 +265,8 @@ class AuditService:
             raise
     
     @staticmethod
-    async def delete_user_data(
-        session: AsyncSession,
+    def delete_user_data(
+        session: Session,
         user_id: int,
         current_user: User,
         reason: str = "user_request"
@@ -280,7 +280,7 @@ class AuditService:
         
         try:
             # Get user
-            user_result = await session.execute(
+            user_result = session.execute(
                 select(User).where(User.id == user_id)
             )
             user = user_result.scalar_one_or_none()
@@ -296,10 +296,10 @@ class AuditService:
             user.first_name = None
             user.last_name = None
             
-            await session.commit()
+            session.commit()
             
             # Log the data deletion
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=current_user.id,
@@ -320,12 +320,12 @@ class AuditService:
             
         except Exception as e:
             logger.error(f"Error deleting user data: {e}")
-            await session.rollback()
+            session.rollback()
             raise
     
     @staticmethod
-    async def cleanup_old_logs(
-        session: AsyncSession,
+    def cleanup_old_logs(
+        session: Session,
         retention_days: int = 365
     ) -> int:
         """
@@ -335,22 +335,22 @@ class AuditService:
             cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
             
             # Get count of logs to be deleted
-            count_result = await session.execute(
+            count_result = session.execute(
                 select(AuditLog).where(AuditLog.timestamp < cutoff_date)
             )
             logs_to_delete = len(count_result.scalars().all())
             
             # Delete old logs
-            await session.execute(
+            session.execute(
                 AuditLog.__table__.delete().where(AuditLog.timestamp < cutoff_date)
             )
-            await session.commit()
+            session.commit()
             
             logger.info(f"Cleaned up {logs_to_delete} old audit logs")
             return logs_to_delete
             
         except Exception as e:
             logger.error(f"Error cleaning up old logs: {e}")
-            await session.rollback()
+            session.rollback()
             raise
 
