@@ -23,11 +23,16 @@ FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
+COPY nginx-main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
+
+# Create directory for pid file
+RUN mkdir -p /tmp/nginx && \
+    chmod 777 /tmp/nginx
 
 # Set proper permissions
 RUN chown -R nextjs:nodejs /usr/share/nginx/html && \
