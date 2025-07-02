@@ -4,7 +4,9 @@ Integration models for managing third-party service connections
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any
-from sqlmodel import SQLModel, Field, Relationship, JSON
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column
+from sqlalchemy.types import JSON
 
 
 class IntegrationType(str, Enum):
@@ -42,7 +44,7 @@ class Integration(SQLModel, table=True):
     status: IntegrationStatus = Field(default=IntegrationStatus.PENDING_SETUP)
     
     # Configuration
-    config: Dict[str, Any] = Field(default_factory=dict, sa_column_kwargs={"type_": JSON})
+    config: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     
     # Health monitoring
     last_health_check: Optional[datetime] = Field(default=None)

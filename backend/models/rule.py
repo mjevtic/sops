@@ -4,7 +4,9 @@ Rule model for automation workflows
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any, List
-from sqlmodel import SQLModel, Field, Relationship, JSON
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column
+from sqlalchemy.types import JSON
 from pydantic import validator
 
 
@@ -31,10 +33,10 @@ class Rule(SQLModel, table=True):
     # Trigger configuration
     trigger_platform: str = Field(max_length=50, index=True)  # zendesk, freshdesk, etc.
     trigger_event: str = Field(max_length=100)  # tag_added, status_changed, etc.
-    trigger_conditions: Dict[str, Any] = Field(default_factory=dict, sa_column_kwargs={"type_": JSON})
+    trigger_conditions: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     
     # Actions configuration
-    actions: List[Dict[str, Any]] = Field(default_factory=list, sa_column_kwargs={"type_": JSON})
+    actions: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
     
     # Execution settings
     is_enabled: bool = Field(default=True)

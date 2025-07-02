@@ -4,7 +4,9 @@ Audit logging model for compliance and security monitoring
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any
-from sqlmodel import SQLModel, Field, Relationship, JSON
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column
+from sqlalchemy.types import JSON
 
 
 class AuditAction(str, Enum):
@@ -66,9 +68,9 @@ class AuditLog(SQLModel, table=True):
     request_id: Optional[str] = Field(default=None, max_length=100, index=True)
     
     # Action details
-    details: Dict[str, Any] = Field(default_factory=dict, sa_column_kwargs={"type_": JSON})
-    old_values: Optional[Dict[str, Any]] = Field(default=None, sa_column_kwargs={"type_": JSON})
-    new_values: Optional[Dict[str, Any]] = Field(default=None, sa_column_kwargs={"type_": JSON})
+    details: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    old_values: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
+    new_values: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     
     # Status and error information
     status: str = Field(default="success", max_length=20)  # success, failed, error
