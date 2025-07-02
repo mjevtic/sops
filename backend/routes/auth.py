@@ -69,6 +69,7 @@ def login(
 @router.post("/refresh", response_model=Token)
 @rate_limit_by_ip("10/minute")
 def refresh_token(
+    request: Request,
     refresh_token: str,
     session: Session = Depends(get_session)
 ):
