@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Refactored Authentication System** to use synchronous database sessions and operations
 - **Improved Error Handling** for database connection failures
 
+#### Middleware
+- **Fixed FastAPI Middleware Import Error** by updating the import path for `BaseHTTPMiddleware`
+- **Added Explicit Starlette Dependency** with version 0.27.0 for compatibility with FastAPI 0.104.1
+
 ## [1.1.0] - 2024-01-15
 
 ### 🎉 Major Enhancements
