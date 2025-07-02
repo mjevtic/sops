@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fixed FastAPI Middleware Import Error** by updating the import path for `BaseHTTPMiddleware`
 - **Added Explicit Starlette Dependency** with version 0.27.0 for compatibility with FastAPI 0.104.1
 
+#### Models
+- **Fixed SQLModel JSON Field Handling** by using proper SQLAlchemy `Column(JSON)` syntax
+- **Updated JSON Field Definitions** in Rule, Audit, and Integration models
+- **Corrected Import Statements** to properly import SQLAlchemy JSON type
+
 ## [1.1.0] - 2024-01-15
 
 ### 🎉 Major Enhancements
