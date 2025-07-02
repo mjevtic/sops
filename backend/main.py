@@ -2,7 +2,7 @@
 Main FastAPI application for SupportOps Automator
 """
 import logging
-from contextlib import asynccontextmanager
+from contextlib import contextmanager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -36,13 +36,12 @@ if settings.sentry_dsn:
     )
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def lifespan(app: FastAPI):
     """Application lifespan management"""
     # Startup
     logger.info("Starting SupportOps Automator...")
     try:
-        await init_database()
+        init_database()
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
@@ -52,7 +51,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     logger.info("Shutting down SupportOps Automator...")
-    await close_db()
+    close_db()
     logger.info("Application shutdown complete")
 
 
