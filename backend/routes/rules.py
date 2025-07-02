@@ -3,7 +3,7 @@ Rule management routes
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, update, and_, desc
 from database import get_session
 from models.rule import Rule, RuleCreate, RuleUpdate, RuleResponse, RuleStatus
@@ -22,11 +22,11 @@ router = APIRouter()
 
 @router.post("/", response_model=RuleResponse)
 @rate_limit_by_user("20/minute")
-async def create_rule(
+def create_rule(
     rule_data: RuleCreate,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Create a new automation rule
@@ -48,12 +48,12 @@ async def create_rule(
         )
         
         session.add(new_rule)
-        await session.commit()
-        await session.refresh(new_rule)
+        session.commit()
+        session.refresh(new_rule)
         
         # Log rule creation
         client_ip = get_remote_address(request)
-        await AuditService.log_action(
+        AuditService.log_action(
             session,
             AuditLogCreate(
                 user_id=current_user.id,
@@ -93,7 +93,7 @@ async def create_rule(
         
     except Exception as e:
         logger.error(f"Rule creation error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Rule creation failed"
@@ -102,14 +102,14 @@ async def create_rule(
 
 @router.get("/", response_model=List[RuleResponse])
 @rate_limit_by_user("30/minute")
-async def get_rules(
+def get_rules(
     skip: int = 0,
     limit: int = 100,
     status_filter: Optional[RuleStatus] = None,
     platform: Optional[str] = None,
     enabled_only: Optional[bool] = None,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Get user's automation rules
@@ -138,7 +138,7 @@ async def get_rules(
         # Apply pagination
         query = query.offset(skip).limit(limit)
         
-        result = await session.execute(query)
+        result = session.execute(query)
         rules = result.scalars().all()
         
         return [
@@ -173,16 +173,16 @@ async def get_rules(
 
 @router.get("/{rule_id}", response_model=RuleResponse)
 @rate_limit_by_user("30/minute")
-async def get_rule(
+def get_rule(
     rule_id: int,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Get a specific rule by ID
     """
     try:
-        result = await session.execute(
+        result = session.execute(
             select(Rule).where(
                 and_(
                     Rule.id == rule_id,
@@ -230,19 +230,19 @@ async def get_rule(
 
 @router.put("/{rule_id}", response_model=RuleResponse)
 @rate_limit_by_user("20/minute")
-async def update_rule(
+def update_rule(
     rule_id: int,
     rule_data: RuleUpdate,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Update an automation rule
     """
     try:
         # Get rule to update
-        result = await session.execute(
+        result = session.execute(
             select(Rule).where(
                 and_(
                     Rule.id == rule_id,
@@ -299,19 +299,19 @@ async def update_rule(
         # Update rule
         if update_data:
             update_data["updated_at"] = datetime.utcnow()
-            await session.execute(
+            session.execute(
                 update(Rule).where(Rule.id == rule_id).values(**update_data)
             )
-            await session.commit()
+            session.commit()
             
             # Refresh rule object
-            await session.refresh(rule)
+            session.refresh(rule)
             
             # Log rule update
             client_ip = get_remote_address(request)
             new_values = {k: str(v) for k, v in update_data.items() if k != "updated_at"}
             
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=current_user.id,
@@ -350,7 +350,7 @@ async def update_rule(
         raise
     except Exception as e:
         logger.error(f"Rule update error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Rule update failed"
@@ -358,19 +358,19 @@ async def update_rule(
 
 
 @router.delete("/{rule_id}")
-@rate_limit_by_user("10/minute")
-async def delete_rule(
+@rate_limit_by_user("20/minute")
+def delete_rule(
     rule_id: int,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Delete a rule (soft delete)
     """
     try:
         # Get rule to delete
-        result = await session.execute(
+        result = session.execute(
             select(Rule).where(
                 and_(
                     Rule.id == rule_id,
@@ -388,17 +388,17 @@ async def delete_rule(
             )
         
         # Soft delete rule
-        await session.execute(
+        session.execute(
             update(Rule).where(Rule.id == rule_id).values(
                 deleted_at=datetime.utcnow(),
                 is_enabled=False
             )
         )
-        await session.commit()
+        session.commit()
         
         # Log rule deletion
         client_ip = get_remote_address(request)
-        await AuditService.log_action(
+        AuditService.log_action(
             session,
             AuditLogCreate(
                 user_id=current_user.id,
@@ -422,7 +422,7 @@ async def delete_rule(
         raise
     except Exception as e:
         logger.error(f"Rule deletion error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Rule deletion failed"
@@ -431,18 +431,18 @@ async def delete_rule(
 
 @router.post("/{rule_id}/test")
 @rate_limit_by_user("10/minute")
-async def test_rule(
+def test_rule(
     rule_id: int,
     test_payload: dict,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Test a rule with sample data
     """
     try:
         # Get rule
-        result = await session.execute(
+        result = session.execute(
             select(Rule).where(
                 and_(
                     Rule.id == rule_id,
@@ -460,7 +460,7 @@ async def test_rule(
             )
         
         # Test rule
-        test_result = await rule_engine.test_rule(session, rule, test_payload)
+        test_result = rule_engine.test_rule(session, rule, test_payload)
         
         return test_result
         
@@ -476,18 +476,18 @@ async def test_rule(
 
 @router.post("/{rule_id}/enable")
 @rate_limit_by_user("10/minute")
-async def enable_rule(
+def enable_rule(
     rule_id: int,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Enable a rule
     """
     try:
         # Get rule
-        result = await session.execute(
+        result = session.execute(
             select(Rule).where(
                 and_(
                     Rule.id == rule_id,
@@ -505,18 +505,18 @@ async def enable_rule(
             )
         
         # Enable rule
-        await session.execute(
+        session.execute(
             update(Rule).where(Rule.id == rule_id).values(
                 is_enabled=True,
                 status=RuleStatus.ACTIVE,
                 updated_at=datetime.utcnow()
             )
         )
-        await session.commit()
+        session.commit()
         
         # Log rule enabling
         client_ip = get_remote_address(request)
-        await AuditService.log_action(
+        AuditService.log_action(
             session,
             AuditLogCreate(
                 user_id=current_user.id,
@@ -539,7 +539,7 @@ async def enable_rule(
         raise
     except Exception as e:
         logger.error(f"Rule enable error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to enable rule"
@@ -548,18 +548,18 @@ async def enable_rule(
 
 @router.post("/{rule_id}/disable")
 @rate_limit_by_user("10/minute")
-async def disable_rule(
+def disable_rule(
     rule_id: int,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Disable a rule
     """
     try:
         # Get rule
-        result = await session.execute(
+        result = session.execute(
             select(Rule).where(
                 and_(
                     Rule.id == rule_id,
@@ -577,18 +577,18 @@ async def disable_rule(
             )
         
         # Disable rule
-        await session.execute(
+        session.execute(
             update(Rule).where(Rule.id == rule_id).values(
                 is_enabled=False,
                 status=RuleStatus.INACTIVE,
                 updated_at=datetime.utcnow()
             )
         )
-        await session.commit()
+        session.commit()
         
         # Log rule disabling
         client_ip = get_remote_address(request)
-        await AuditService.log_action(
+        AuditService.log_action(
             session,
             AuditLogCreate(
                 user_id=current_user.id,
@@ -611,7 +611,7 @@ async def disable_rule(
         raise
     except Exception as e:
         logger.error(f"Rule disable error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to disable rule"

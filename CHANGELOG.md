@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Refactored Authentication System** to use synchronous database sessions and operations
 - **Improved Error Handling** for database connection failures
 
+#### Integrations Module
+- **Restructured Integrations Module** into a modular package for better maintainability
+- **Converted All Async Code** in integrations routes to synchronous
+- **Fixed HTTP Client Usage** by replacing async `httpx` with synchronous `requests`
+- **Improved Connection Testing** with proper error handling
+- **Enhanced Code Organization** by separating handlers by functionality
+- **Eliminated Async/Await Keywords** to ensure compatibility with synchronous SQLAlchemy
+
 #### Middleware
 - **Fixed FastAPI Middleware Import Error** by updating the import path for `BaseHTTPMiddleware`
 - **Added Explicit Starlette Dependency** with version 0.27.0 for compatibility with FastAPI 0.104.1

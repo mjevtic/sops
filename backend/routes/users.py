@@ -3,7 +3,7 @@ User management routes with RBAC and security features
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, update, and_
 from database import get_session
 from models.user import User, UserCreate, UserUpdate, UserResponse, UserRole, get_password_hash
@@ -18,18 +18,18 @@ router = APIRouter()
 
 
 @router.post("/", response_model=UserResponse)
-async def create_user(
+def create_user(
     user_data: UserCreate,
     request: Request,
     current_user: User = Depends(require_admin),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Create a new user (admin only)
     """
     try:
         # Check if user already exists
-        existing_user = await session.execute(
+        existing_user = session.execute(
             select(User).where(
                 (User.email == user_data.email) | (User.username == user_data.username)
             )
@@ -54,12 +54,12 @@ async def create_user(
         )
         
         session.add(new_user)
-        await session.commit()
-        await session.refresh(new_user)
+        session.commit()
+        session.refresh(new_user)
         
         # Log user creation
         client_ip = get_remote_address(request)
-        await AuditService.log_action(
+        AuditService.log_action(
             session,
             AuditLogCreate(
                 user_id=current_user.id,
@@ -92,7 +92,7 @@ async def create_user(
         raise
     except Exception as e:
         logger.error(f"User creation error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="User creation failed"
@@ -101,13 +101,13 @@ async def create_user(
 
 @router.get("/", response_model=List[UserResponse])
 @rate_limit_by_user("30/minute")
-async def get_users(
+def get_users(
     skip: int = 0,
     limit: int = 100,
     role: Optional[UserRole] = None,
     is_active: Optional[bool] = None,
     current_user: User = Depends(require_admin),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Get list of users (admin only)
@@ -124,7 +124,7 @@ async def get_users(
         # Apply pagination
         query = query.offset(skip).limit(limit)
         
-        result = await session.execute(query)
+        result = session.execute(query)
         users = result.scalars().all()
         
         return [
@@ -153,10 +153,10 @@ async def get_users(
 
 @router.get("/{user_id}", response_model=UserResponse)
 @rate_limit_by_user("30/minute")
-async def get_user(
+def get_user(
     user_id: int,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Get user by ID (admin can see all, users can see themselves)
@@ -169,7 +169,7 @@ async def get_user(
                 detail="Access denied"
             )
         
-        result = await session.execute(
+        result = session.execute(
             select(User).where(
                 and_(User.id == user_id, User.deleted_at.is_(None))
             )
@@ -206,12 +206,12 @@ async def get_user(
 
 
 @router.put("/{user_id}", response_model=UserResponse)
-async def update_user(
+def update_user(
     user_id: int,
     user_data: UserUpdate,
     request: Request,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Update user (admin can update all, users can update themselves with restrictions)
@@ -225,7 +225,7 @@ async def update_user(
             )
         
         # Get user to update
-        result = await session.execute(
+        result = session.execute(
             select(User).where(
                 and_(User.id == user_id, User.deleted_at.is_(None))
             )
@@ -262,7 +262,7 @@ async def update_user(
         # Apply updates
         if user_data.email is not None:
             # Check if email is already taken
-            existing = await session.execute(
+            existing = session.execute(
                 select(User).where(
                     and_(User.email == user_data.email, User.id != user_id)
                 )
@@ -276,7 +276,7 @@ async def update_user(
         
         if user_data.username is not None:
             # Check if username is already taken
-            existing = await session.execute(
+            existing = session.execute(
                 select(User).where(
                     and_(User.username == user_data.username, User.id != user_id)
                 )
@@ -303,19 +303,19 @@ async def update_user(
         # Update user
         if update_data:
             update_data["updated_at"] = datetime.utcnow()
-            await session.execute(
+            session.execute(
                 update(User).where(User.id == user_id).values(**update_data)
             )
-            await session.commit()
+            session.commit()
             
             # Refresh user object
-            await session.refresh(user)
+            session.refresh(user)
             
             # Log user update
             client_ip = get_remote_address(request)
             new_values = {k: str(v) for k, v in update_data.items() if k != "updated_at"}
             
-            await AuditService.log_action(
+            AuditService.log_action(
                 session,
                 AuditLogCreate(
                     user_id=current_user.id,
@@ -347,19 +347,20 @@ async def update_user(
         raise
     except Exception as e:
         logger.error(f"User update error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="User update failed"
         )
 
 
-@router.delete("/{user_id}")
-async def delete_user(
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@rate_limit_by_user("5/minute")
+def delete_user(
     user_id: int,
     request: Request,
     current_user: User = Depends(require_admin),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Delete user (soft delete for GDPR compliance) - admin only
@@ -373,7 +374,7 @@ async def delete_user(
             )
         
         # Get user to delete
-        result = await session.execute(
+        result = session.execute(
             select(User).where(
                 and_(User.id == user_id, User.deleted_at.is_(None))
             )
@@ -388,7 +389,7 @@ async def delete_user(
         
         # Soft delete user
         from datetime import datetime
-        await session.execute(
+        session.execute(
             update(User).where(User.id == user_id).values(
                 deleted_at=datetime.utcnow(),
                 is_active=False,
@@ -396,11 +397,11 @@ async def delete_user(
                 username=f"deleted_{user_id}"
             )
         )
-        await session.commit()
+        session.commit()
         
         # Log user deletion
         client_ip = get_remote_address(request)
-        await AuditService.log_action(
+        AuditService.log_action(
             session,
             AuditLogCreate(
                 user_id=current_user.id,
@@ -423,7 +424,7 @@ async def delete_user(
         raise
     except Exception as e:
         logger.error(f"User deletion error: {e}")
-        await session.rollback()
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="User deletion failed"
@@ -431,16 +432,16 @@ async def delete_user(
 
 
 @router.post("/{user_id}/export-data")
-async def export_user_data(
+def export_user_data(
     user_id: int,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Export user data for GDPR compliance
     """
     try:
-        export_data = await AuditService.export_user_data(
+        export_data = AuditService.export_user_data(
             session, user_id, current_user
         )
         
