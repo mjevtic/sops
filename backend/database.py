@@ -23,7 +23,13 @@ def get_database_url(url):
     return url
 
 # Create sync engine with security configurations
-db_url = get_database_url(settings.database_url)
+try:
+    db_url = get_database_url(settings.database_url)
+    logger.info(f"Using database URL: {db_url.replace(db_url.split('@')[0], '***')}")  # Log sanitized URL
+except Exception as e:
+    logger.error(f"Invalid database URL format: {e}")
+    db_url = "sqlite:///./test.db"  # Fallback to SQLite
+    logger.warning(f"Falling back to SQLite database: {db_url}")
 
 # Configure engine based on database type
 if db_url.startswith('sqlite'):
@@ -131,11 +137,47 @@ def close_db():
         logger.error(f"Error closing database connections: {e}")
 
 
+def check_database_connection():
+    """
+    Check if database connection is working
+    Returns True if connection is successful, False otherwise
+    """
+    try:
+        # Try to connect to the database and execute a simple query
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            logger.info("Database connection successful")
+            return True
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        return False
+
 # Database initialization
 def init_database():
     """
     Initialize database with default data
     """
+    # First check if database connection is working
+    if not check_database_connection():
+        logger.warning("Database connection failed, will retry once more")
+        # Wait a bit and retry once more
+        import time
+        time.sleep(5)
+        if not check_database_connection():
+            logger.error("Database connection failed after retry")
+            if not db_url.startswith('sqlite'):
+                logger.warning("Falling back to SQLite database")
+                global engine, SessionLocal
+                engine = create_engine(
+                    "sqlite:///./fallback.db",
+                    echo=settings.environment == "development",
+                    connect_args={"check_same_thread": False}
+                )
+                SessionLocal = sessionmaker(autocommit=False, autoflush=True, bind=engine)
+            else:
+                logger.error("Already using SQLite, cannot fallback further")
+                raise Exception("Database connection failed")
+    
     try:
         # Create tables
         create_db_and_tables()
@@ -153,10 +195,12 @@ def init_database():
             
             if not admin_user:
                 # Create default admin user
+                admin_email = settings.admin_email or "admin@supportops.local"
+                admin_password = settings.admin_password or "admin123!"
                 admin_user = User(
-                    email="admin@supportops.local",
+                    email=admin_email,
                     username="admin",
-                    hashed_password=get_password_hash("admin123!"),
+                    hashed_password=get_password_hash(admin_password),
                     role=UserRole.ADMIN,
                     is_active=True,
                     is_verified=True,
@@ -165,7 +209,7 @@ def init_database():
                 )
                 session.add(admin_user)
                 # No need to explicitly commit as get_db_session will do it
-                logger.info("Default admin user created")
+                logger.info(f"Default admin user created with email: {admin_email}")
             
         logger.info("Database initialization completed")
         
