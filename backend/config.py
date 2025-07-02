@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     
     # Webhook Security
-    webhook_secret: str
+    webhook_secret: str = ""  # Make optional for initial setup
     
     # Monitoring
     sentry_dsn: str = ""
