@@ -13,16 +13,28 @@ from config import settings
 logging.basicConfig(level=getattr(logging, settings.log_level))
 logger = logging.getLogger(__name__)
 
-# Fix postgres:// to postgresql:// if needed
-def fix_postgres_url(url):
-    """Convert postgres:// to postgresql:// if needed"""
+# Fix database URL for async connections
+def fix_database_url(url):
+    """Fix database URL for async connections
+    1. Convert postgres:// to postgresql:// if needed
+    2. Ensure the URL uses the asyncpg driver
+    """
+    # Step 1: Fix postgres:// to postgresql://
     if url.startswith('postgres://'):
-        return url.replace('postgres://', 'postgresql://', 1)
+        url = url.replace('postgres://', 'postgresql://', 1)
+    
+    # Step 2: Add driver name if not present
+    if '?driver=' not in url and '+' not in url:
+        if '?' in url:
+            url = url.replace('?', '?driver=asyncpg&', 1)
+        else:
+            url = url + '?driver=asyncpg'
+    
     return url
 
 # Create async engine with security configurations
 engine = create_async_engine(
-    fix_postgres_url(settings.database_url),
+    fix_database_url(settings.database_url),
     echo=settings.environment == "development",
     pool_pre_ping=True,  # Verify connections before use
     pool_recycle=3600,   # Recycle connections every hour
