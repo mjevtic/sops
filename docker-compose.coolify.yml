@@ -1,0 +1,151 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: supportops
+      POSTGRES_USER: supportops
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supportops -d supportops"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - supportops-network
+
+  # Redis for Rate Limiting and Caching
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - supportops-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://supportops:${DATABASE_PASSWORD}@postgres:5432/supportops
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: supportops
+      DATABASE_USER: supportops
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      
+      # Security Configuration
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      
+      # Application Configuration
+      ENVIRONMENT: production
+      DEBUG: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: "true"
+      MAX_REQUESTS_PER_MINUTE: 100
+      
+      # Security Settings
+      SESSION_TIMEOUT_MINUTES: 30
+      PASSWORD_MIN_LENGTH: 8
+      REQUIRE_SPECIAL_CHARS: "true"
+      
+      # Audit Settings
+      AUDIT_RETENTION_DAYS: 365
+      
+      # Admin User (for initial setup)
+      ADMIN_USERNAME: admin
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@company.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_FULL_NAME: "System Administrator"
+      
+      # Webhook Secrets
+      ZENDESK_WEBHOOK_SECRET: ${ZENDESK_WEBHOOK_SECRET:-}
+      FRESHDESK_WEBHOOK_SECRET: ${FRESHDESK_WEBHOOK_SECRET:-}
+      JIRA_WEBHOOK_SECRET: ${JIRA_WEBHOOK_SECRET:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - backend_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - supportops-network
+    labels:
+      - "coolify.managed=true"
+      - "coolify.type=application"
+      - "coolify.name=supportops-backend"
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+      VITE_APP_NAME: "SupportOps Automator"
+      VITE_APP_VERSION: "1.1.0"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - supportops-network
+    labels:
+      - "coolify.managed=true"
+      - "coolify.type=application"
+      - "coolify.name=supportops-frontend"
+      - "traefik.enable=true"
+      - "traefik.http.routers.supportops.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.supportops.tls=true"
+      - "traefik.http.routers.supportops.tls.certresolver=letsencrypt"
+      - "traefik.http.services.supportops.loadbalancer.server.port=3000"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  supportops-network:
+    driver: bridge
+
