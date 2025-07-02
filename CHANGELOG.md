@@ -5,6 +5,19 @@ All notable changes to the SupportOps Automator project will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-07-02
+
+### 🐛 Bug Fixes
+
+#### Database Connection
+- **Fixed SQLAlchemy Driver Compatibility** by converting from async to synchronous SQLAlchemy usage
+- **Updated Database URL Handling** to properly convert `postgres://` to `postgresql://` format
+- **Removed Async Database Dependencies** to resolve driver compatibility issues
+- **Converted Database Functions** from async to synchronous in `database.py`
+- **Updated Application Lifecycle** in `main.py` to use synchronous database initialization
+- **Refactored Authentication System** to use synchronous database sessions and operations
+- **Improved Error Handling** for database connection failures
+
 ## [1.1.0] - 2024-01-15
 
 ### 🎉 Major Enhancements
