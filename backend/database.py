@@ -46,7 +46,7 @@ else:
             "sslmode": "require" if settings.environment == "production" else "prefer",
             "application_name": "supportops-automator",
             "connect_timeout": 10,
-            "command_timeout": 30,
+            # "command_timeout": 30,  # Removed - not supported by psycopg2 (only by asyncpg)
         }
     )
 
