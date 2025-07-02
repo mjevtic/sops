@@ -3,7 +3,7 @@ Authentication routes with security features
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from database import get_session
 from models.user import User, UserLogin, UserCreate, UserResponse, Token
 from models.audit import AuditLogCreate, AuditAction
@@ -19,10 +19,10 @@ security = HTTPBearer()
 
 @router.post("/login", response_model=Token)
 @rate_limit_by_ip("5/minute")
-async def login(
+def login(
     user_credentials: UserLogin,
     request: Request,
-    session: AsyncSession = Depends(get_session)
+    session: Session = Depends(get_session)
 ):
     """
     Authenticate user and return JWT tokens
@@ -31,7 +31,7 @@ async def login(
         client_ip = get_remote_address(request)
         user_agent = request.headers.get("user-agent")
         
-        user = await AuthService.authenticate_user(
+        user = AuthService.authenticate_user(
             session=session,
             username=user_credentials.username,
             password=user_credentials.password,

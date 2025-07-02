@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from models.user import User, UserRole, verify_password, get_password_hash, Token, TokenData
 from models.audit import AuditLog, AuditAction
@@ -19,8 +19,8 @@ class AuthService:
     """Authentication service with security features"""
     
     @staticmethod
-    async def authenticate_user(
-        session: AsyncSession, 
+    def authenticate_user(
+        session: Session, 
         username: str, 
         password: str,
         ip_address: Optional[str] = None,
@@ -31,7 +31,7 @@ class AuthService:
         """
         try:
             # Get user by username or email
-            result = await session.execute(
+            result = session.execute(
                 select(User).where(
                     (User.username == username) | (User.email == username)
                 )
@@ -40,21 +40,21 @@ class AuthService:
             
             if not user:
                 # Log failed login attempt
-                await AuthService._log_failed_login(
+                AuthService._log_failed_login(
                     session, username, "user_not_found", ip_address, user_agent
                 )
                 return None
             
             # Check if user is active
             if not user.is_active:
-                await AuthService._log_failed_login(
+                AuthService._log_failed_login(
                     session, username, "user_inactive", ip_address, user_agent
                 )
                 return None
             
             # Check for account lockout (after 5 failed attempts)
             if user.failed_login_attempts >= 5:
-                await AuthService._log_failed_login(
+                AuthService._log_failed_login(
                     session, username, "account_locked", ip_address, user_agent
                 )
                 return None
@@ -62,20 +62,20 @@ class AuthService:
             # Verify password
             if not verify_password(password, user.hashed_password):
                 # Increment failed login attempts
-                await session.execute(
+                session.execute(
                     update(User)
                     .where(User.id == user.id)
                     .values(failed_login_attempts=user.failed_login_attempts + 1)
                 )
-                await session.commit()
+                session.commit()
                 
-                await AuthService._log_failed_login(
+                AuthService._log_failed_login(
                     session, username, "invalid_password", ip_address, user_agent
                 )
                 return None
             
             # Successful login - reset failed attempts and update last login
-            await session.execute(
+            session.execute(
                 update(User)
                 .where(User.id == user.id)
                 .values(
@@ -83,7 +83,7 @@ class AuthService:
                     last_login=datetime.utcnow()
                 )
             )
-            await session.commit()
+            session.commit()
             
             # Log successful login
             audit_log = AuditLog(
@@ -98,18 +98,18 @@ class AuthService:
                 status="success"
             )
             session.add(audit_log)
-            await session.commit()
+            session.commit()
             
             return user
             
         except Exception as e:
             logger.error(f"Authentication error: {e}")
-            await session.rollback()
+            session.rollback()
             return None
     
     @staticmethod
-    async def _log_failed_login(
-        session: AsyncSession,
+    def _log_failed_login(
+        session: Session,
         username: str,
         reason: str,
         ip_address: Optional[str] = None,
@@ -126,7 +126,7 @@ class AuthService:
             status="failed"
         )
         session.add(audit_log)
-        await session.commit()
+        session.commit()
     
     @staticmethod
     def create_access_token(user: User) -> str:
