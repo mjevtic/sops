@@ -14,10 +14,11 @@ services:
       - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U supportops -d supportops"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U supportops -d supportops || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - supportops-network
 
@@ -43,7 +44,8 @@ services:
       dockerfile: Dockerfile
     environment:
       # Database Configuration
-      DATABASE_URL: postgresql://supportops:${DATABASE_PASSWORD}@postgres:5432/supportops
+      # Use environment variable directly to avoid encoding issues
+      DATABASE_URL: ${DATABASE_URL:-postgresql://supportops:${DATABASE_PASSWORD}@postgres:5432/supportops}
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
       DATABASE_NAME: supportops
