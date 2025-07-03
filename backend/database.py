@@ -195,8 +195,16 @@ def init_database():
             
             if not admin_user:
                 # Create default admin user
-                admin_email = settings.admin_email or "admin@supportops.local"
-                admin_password = settings.admin_password or "admin123!"
+                try:
+                    # Get admin credentials from settings
+                    admin_email = settings.admin_email
+                    admin_password = settings.admin_password
+                except AttributeError:
+                    # Fallback to default values if not in settings
+                    admin_email = "admin@supportops.local"
+                    admin_password = "admin123!"
+                    logger.warning(f"Admin credentials not found in settings, using defaults")
+                
                 admin_user = User(
                     email=admin_email,
                     username="admin",

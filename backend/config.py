@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     freshdesk_webhook_secret: str = ""  # Secret for Freshdesk webhook validation
     zendesk_webhook_secret: str = ""  # Secret for Zendesk webhook validation
     
+    # Admin User
+    admin_email: str = "admin@supportops.local"  # Default admin email
+    admin_password: str = "admin123!"  # Default admin password
+    
     # Monitoring
     sentry_dsn: str = ""
     environment: str = "development"
