@@ -24,8 +24,27 @@ def get_database_url(url):
 
 # Create sync engine with security configurations
 try:
-    db_url = get_database_url(settings.database_url)
-    logger.info(f"Using database URL: {db_url.replace(db_url.split('@')[0], '***')}")  # Log sanitized URL
+    # First, try to construct URL from individual components (Docker/Coolify style)
+    if settings.database_host and settings.database_user and settings.database_password and settings.database_name:
+        constructed_url = f"postgresql://{settings.database_user}:{settings.database_password}@{settings.database_host}:{settings.database_port or '5432'}/{settings.database_name}"
+        db_url = get_database_url(constructed_url)
+        logger.info(f"Using constructed database URL from components")
+    # Otherwise use the database_url setting
+    elif settings.database_url:
+        db_url = get_database_url(settings.database_url)
+        logger.info(f"Using database URL from settings")
+    else:
+        # Fallback to SQLite
+        db_url = "sqlite:///./test.db"
+        logger.warning(f"No database configuration found, falling back to SQLite database: {db_url}")
+    
+    # Log sanitized URL (hide credentials)
+    if '@' in db_url:
+        sanitized_url = db_url.replace(db_url.split('@')[0], '***')
+    else:
+        sanitized_url = db_url
+    logger.info(f"Database URL: {sanitized_url}")
+    
 except Exception as e:
     logger.error(f"Invalid database URL format: {e}")
     db_url = "sqlite:///./test.db"  # Fallback to SQLite
@@ -145,11 +164,30 @@ def check_database_connection():
     try:
         # Try to connect to the database and execute a simple query
         with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
+            result = connection.execute(text("SELECT 1"))
+            result.fetchone()  # Actually fetch the result to verify connection
+            
+            # Get database info for diagnostics
+            if not db_url.startswith('sqlite'):
+                try:
+                    db_info = connection.execute(text("SELECT version()")).fetchone()[0]
+                    logger.info(f"Connected to database: {db_info}")
+                except:
+                    pass  # Skip if we can't get version info
+            
             logger.info("Database connection successful")
             return True
     except Exception as e:
         logger.error(f"Database connection failed: {e}")
+        
+        # Provide more detailed diagnostics based on error type
+        if "could not translate host name" in str(e).lower():
+            logger.error(f"DNS resolution error: Could not resolve database hostname. Check network configuration and DNS settings.")
+        elif "connection refused" in str(e).lower():
+            logger.error(f"Connection refused: Database server is not accepting connections. Check if database is running and accessible.")
+        elif "authentication failed" in str(e).lower():
+            logger.error(f"Authentication error: Invalid username or password. Check database credentials.")
+        
         return False
 
 # Database initialization

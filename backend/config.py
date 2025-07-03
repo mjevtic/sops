@@ -12,30 +12,43 @@ class Settings(BaseSettings):
     """Application settings with validation and security features"""
     
     # Database
-    database_url: str
+    database_url: str = ""
     
     # Security
-    secret_key: str
+    secret_key: str = ""
+    jwt_secret_key: str = ""  # Added for Coolify compatibility
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
-    encryption_key: str
+    encryption_key: str = ""
     
     # CORS
     allowed_origins: List[str] = ["http://localhost:3000"]
+    cors_origins: str = "*"  # Added for Coolify compatibility
     
     # Rate Limiting
     rate_limit_per_minute: int = 60
+    max_requests_per_minute: int = 100  # Added for Coolify compatibility
     redis_url: str = "redis://localhost:6379"
     
     # Webhook Security
     webhook_secret: str = ""  # Make optional for initial setup
     freshdesk_webhook_secret: str = ""  # Secret for Freshdesk webhook validation
     zendesk_webhook_secret: str = ""  # Secret for Zendesk webhook validation
+    jira_webhook_secret: str = ""  # Added for Coolify compatibility
+    github_webhook_secret: str = ""  # Added for Coolify compatibility
     
     # Admin User
     admin_email: str = "admin@supportops.local"  # Default admin email
     admin_password: str = "admin123!"  # Default admin password
+    admin_username: str = "admin"  # Added for Coolify compatibility
+    
+    # Database Connection (for Docker/Coolify compatibility)
+    database_host: str = ""  # Added for Docker networking
+    database_port: str = ""  # Added for Docker networking
+    database_name: str = ""  # Added for Docker networking
+    database_user: str = ""  # Added for Docker networking
+    database_password: str = ""  # Added for Docker networking
     
     # Monitoring
     sentry_dsn: str = ""
