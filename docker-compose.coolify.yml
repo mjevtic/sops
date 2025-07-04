@@ -1,26 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: supportops
-      POSTGRES_USER: supportops
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_HOST_AUTH_METHOD: md5
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U supportops -d supportops || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - supportops-network
+  # Using external PostgreSQL database instead of running our own container
 
   # Redis for Rate Limiting and Caching
   redis:
@@ -43,14 +24,13 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     environment:
-      # Database Configuration
-      # Use environment variable directly to avoid encoding issues
-      DATABASE_URL: ${DATABASE_URL:-postgresql://supportops:${DATABASE_PASSWORD}@postgres:5432/supportops}
-      DATABASE_HOST: postgres
+      # Database Configuration - Using external PostgreSQL database
+      DATABASE_URL: postgres://postgres:aF8M2enrmVYUYfyKlomgk2cVG5rucmK9lEqA6uEKq@pcsosgk8g8wskwwcwwg0swss:5432/postgres?sslmode=require
+      DATABASE_HOST: pcsosgk8g8wskwwcwwg0swss
       DATABASE_PORT: 5432
-      DATABASE_NAME: supportops
-      DATABASE_USER: supportops
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: postgres
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: aF8M2enrmVYUYfyKlomgk2cVG5rucmK9lEqA6uEKq
       
       # Security Configuration
       SECRET_KEY: ${SECRET_KEY}
@@ -91,8 +71,6 @@ services:
       JIRA_WEBHOOK_SECRET: ${JIRA_WEBHOOK_SECRET:-}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -140,8 +118,6 @@ services:
       - "traefik.http.services.supportops.loadbalancer.server.port=3000"
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   backend_logs:

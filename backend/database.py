@@ -24,17 +24,23 @@ def get_database_url(url):
 
 # Create sync engine with security configurations
 try:
-    # First, try to construct URL from individual components (Docker/Coolify style)
-    if settings.database_host and settings.database_user and settings.database_password and settings.database_name:
+    # First, try to use the hardcoded PostgreSQL URL for Coolify deployment
+    hardcoded_url = "postgres://postgres:aF8M2enrmVYUYfyKlomgk2cVG5rucmK9lEqA6uEKq@pcsosgk8g8wskwwcwwg0swss:5432/postgres?sslmode=require"
+    db_url = get_database_url(hardcoded_url)
+    logger.info(f"Using hardcoded PostgreSQL database URL for Coolify deployment")
+    
+    # Fallback options if the hardcoded URL doesn't work
+    # 1. Try to construct URL from individual components (Docker/Coolify style)
+    if not db_url and settings.database_host and settings.database_user and settings.database_password and settings.database_name:
         constructed_url = f"postgresql://{settings.database_user}:{settings.database_password}@{settings.database_host}:{settings.database_port or '5432'}/{settings.database_name}"
         db_url = get_database_url(constructed_url)
         logger.info(f"Using constructed database URL from components")
-    # Otherwise use the database_url setting
-    elif settings.database_url:
+    # 2. Otherwise use the database_url setting
+    elif not db_url and settings.database_url:
         db_url = get_database_url(settings.database_url)
         logger.info(f"Using database URL from settings")
-    else:
-        # Fallback to SQLite
+    # 3. Fallback to SQLite
+    elif not db_url:
         db_url = "sqlite:///./test.db"
         logger.warning(f"No database configuration found, falling back to SQLite database: {db_url}")
     
